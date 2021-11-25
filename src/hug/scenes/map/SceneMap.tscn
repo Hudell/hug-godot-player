@@ -1,0 +1,35 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://src/hug/scenes/map/SceneMap.gd" type="Script" id=1]
+[ext_resource path="res://src/hug/scenes/map/ui/MapUI.tscn" type="PackedScene" id=2]
+[ext_resource path="res://src/maps/House.tscn" type="PackedScene" id=3]
+
+[node name="SceneMap" type="Node2D"]
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_horizontal_guides_": [ 195.0 ],
+"_edit_vertical_guides_": [ 547.0 ]
+}
+
+[node name="MapUI" parent="." instance=ExtResource( 2 )]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+current = true
+process_mode = 0
+limit_left = 0
+limit_top = 0
+limit_right = 1280
+limit_bottom = 768
+smoothing_enabled = true
+smoothing_speed = 30.0
+offset_h = 1.0
+offset_v = 1.0
+editor_draw_limits = true
+
+[node name="MapHolder" type="Node2D" parent="."]
+
+[node name="House" parent="MapHolder" instance=ExtResource( 3 )]
+
+[node name="YSort" type="YSort" parent="."]
+
+[connection signal="tree_entered" from="." to="." method="_on_SceneMap_tree_entered"]
