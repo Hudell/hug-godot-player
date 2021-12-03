@@ -15,14 +15,21 @@ enum {
 const MAX_SPEED = 300.0
 const MAX_WALK_SPEED = 200.0
 const MIN_MOVING_SPEED = 10
+const GRAVITY = 400.0
+const UP = Vector2.UP
+const JUMP_STRENGTH = 400
 
 var state = MOVE
 var velocity = Vector2.ZERO
+var gravity_velocity = Vector2.ZERO
+var jump_velocity = Vector2.ZERO
+var jump_timeout = 0.0
 var is_running = false
 var loaded_actor_name = null
 var loaded_actor_data = false
 var actor_instance = null setget set_nothing
 var direction = null setget set_direction
+var is_platforming = false setget set_nothing
 
 func _ready() -> void:
 	animation_tree.active = true
@@ -46,9 +53,11 @@ func _physics_process(delta: float) -> void:
 			pass
 
 func move_state(delta: float) -> void:
+	if jump_timeout > 0:
+		jump_timeout = max(0, jump_timeout - delta)
+
 	move_by_input(delta)
 	update_move_animation()
-	
 	move()
 	
 	check_interactions()
@@ -97,12 +106,34 @@ func start_walking() -> void:
 func stop_moving() -> void:
 	travel("Idle")
 
+func get_speed() -> float:
+	if is_platforming:
+		return abs(velocity.x)
+
+	return max(abs(velocity.x), abs(velocity.y))
+
+func update_move_animation_platforming() -> void:
+	if velocity.x == 0:
+		stop_moving()
+		return
+		
+	var speed = get_speed()
+	if speed < MIN_MOVING_SPEED:
+		stop_moving()
+		return
+		
+	start_walking()
+
 func update_move_animation() -> void:
+	if is_platforming:
+		update_move_animation_platforming()
+		return
+
 	if velocity == Vector2.ZERO:
 		stop_moving()
 		return
 		
-	var speed = max(abs(velocity.x), abs(velocity.y))
+	var speed = get_speed()
 
 	if speed < MIN_MOVING_SPEED:
 		stop_moving()
@@ -111,7 +142,21 @@ func update_move_animation() -> void:
 	start_walking()
 
 func move() -> void:
-	velocity = move_and_slide(velocity)
+	if is_platforming:
+		if jump_velocity != Vector2.ZERO:
+			jump_velocity = move_and_slide(jump_velocity, UP)
+			if jump_velocity.y + GRAVITY > 0:
+				jump_timeout = 0
+				jump_velocity = Vector2.ZERO
+			elif jump_timeout == 0:
+				jump_velocity.y = min(0, jump_velocity.y + 10)
+		elif !is_on_floor():
+			gravity_velocity = Vector2.DOWN * GRAVITY
+	else:
+		gravity_velocity = Vector2.ZERO
+	
+	velocity = move_and_slide(velocity, UP)
+	gravity_velocity = move_and_slide(gravity_velocity, UP)
 
 func mark_as_dead() -> void:
 	state = DEAD
@@ -121,11 +166,16 @@ func mark_as_dead() -> void:
 func move_by_input(delta: float) -> void:
 	var input_vector = Vector2.ZERO
 	input_vector.x = Input.get_action_strength("ui_right") - Input.get_action_strength("ui_left")
-	input_vector.y = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
+	if is_platforming:
+		if is_on_floor() and Input.is_action_just_pressed("ui_up"):
+			jump_velocity.y = -JUMP_STRENGTH
+			jump_timeout = 0.4
+	else:
+		input_vector.y = Input.get_action_strength("ui_down") - Input.get_action_strength("ui_up")
 	input_vector = input_vector.normalized()
 	
 	is_running = Input.is_action_pressed("run")
-	apply_move_vector(input_vector, delta)	
+	apply_move_vector(input_vector, delta)
 
 func set_camera_path(camera_path: NodePath) -> void:
 	$RemoteTransform2D.remote_path = camera_path
@@ -154,6 +204,11 @@ func set_actor_name(actor_name):
 	apply_loaded_actor_data()
 
 func apply_loaded_actor_data():
+	if actor_instance == null:
+		return
+	
+	is_platforming = actor_instance is GamePlatformActor
+	
 	var sprite = get_sprite()
 	if sprite == null:
 		return

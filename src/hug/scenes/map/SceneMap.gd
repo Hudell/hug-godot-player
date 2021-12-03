@@ -76,6 +76,8 @@ func initialize():
 	
 	load_initial_player()
 	load_window_skin()
+	if HUG.map_name:
+		load_map(HUG.map_name)
 	initialized = true
 
 func _on_SceneMap_tree_entered() -> void:
